@@ -44,18 +44,9 @@ print("\nDataset Shape:", df.shape)
 print("\nDataset Information:")
 df.info()
 
-# Explore dataset
-
-# Dataset dimensions
-print("Dataset Shape:", df.shape)
-
 # Column names
 print("\nColumn Names:")
 print(df.columns.tolist())
-
-# Data types and non-null counts
-print("\nDataset Information:")
-df.info()
 
 # Summary statistics
 print("\nNumerical Summary:")
@@ -66,9 +57,6 @@ print("\nCategorical Summary:")
 print(df.describe(include=["object", "str", "category"]))
 
 # Convert data types
-
-
-import pandas as pd
 
 # Create a copy of the original dataset
 df_clean = df.copy()
@@ -121,14 +109,6 @@ print("Invalid Dates:", len(invalid_dates))
 print(invalid_dates)
 
 df_clean = df_clean.dropna()
-
-# Check invalid or missing dates
-invalid_dates = df_clean[df_clean["Month/Year"].isna()]
-
-print("Invalid Dates:", len(invalid_dates))
-print(invalid_dates)
-
-
 
 #  Check full-row duplicates
 print("Duplicate Records:")
@@ -236,19 +216,20 @@ print("Invalid Entries per Column:")
 print(invalid_entries.sum().to_frame("Invalid Count"))
 
 # Clean column names (remove whitespace, lowercase, and replace spaces)
-df.columns = (
-    df.columns
+df_clean.columns = (
+    df_clean.columns
     .str.strip()
     .str.lower()
-    .str.replace(r"\s+", "_", regex=True)
-    .str.replace(r"[^\w]", "", regex=True)
+    .str.replace(r"[^a-z0-9]+", "_", regex=True)
+    .str.rstrip("_")
 )
 
 print("Cleaned Column Names:")
-print(df.columns.tolist())
+print(df_clean.columns.tolist())
 
 
-#Save the cleaned dataset next to this script
-output_path = Path(__file__).resolve().parent / "auto_prices_cleaned.csv"
+#Save the cleaned dataset
+output_path = Path(__file__).resolve().parent / "data" / "auto_prices_cleaned.csv"
+output_path.parent.mkdir(exist_ok=True)
 df_clean.to_csv(output_path, index=False)
 print(f"\nCleaned dataset saved to: {output_path}")
