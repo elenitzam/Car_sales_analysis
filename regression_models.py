@@ -1,6 +1,6 @@
 
 # ============================================================
-# CAR SALES REGRESSION: kNN AND DECISION TREE
+# CAR SALES REGRESSION: FOUR MODELS
 # ============================================================
 
 # 1. IMPORT LIBRARIES
@@ -12,10 +12,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor, plot_tree
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
@@ -45,6 +46,9 @@ df["month_year"] = pd.to_datetime(
 # Order data chronologically
 df = df.sort_values("month_year").reset_index(drop=True)
 
+# Create a numerical time feature
+df["month_index"] = range(len(df))
+
 
 # ============================================================
 # 3. DEFINE PREDICTORS AND TARGET
@@ -54,7 +58,8 @@ features = [
     "new_price",
     "used_price",
     "inflation_rate",
-    "interest_rate"
+    "interest_rate",
+    "month_index"
 ]
 
 target = "units_sold"
@@ -88,7 +93,64 @@ print("Testing observations:", len(test))
 
 
 # ============================================================
-# 5. TIME-SERIES CROSS-VALIDATION
+# 5. LINEAR REGRESSION
+# ============================================================
+
+linear_model = LinearRegression()
+
+# Train the model using 2019–2022 data
+linear_model.fit(X_train, y_train)
+
+# Predict car sales for 2023
+linear_predictions = linear_model.predict(X_test)
+
+# Calculate evaluation metrics
+linear_mae = mean_absolute_error(y_test, linear_predictions)
+
+linear_rmse = np.sqrt(
+    mean_squared_error(y_test, linear_predictions)
+)
+
+linear_r2 = r2_score(y_test, linear_predictions)
+
+print("\n===== LINEAR REGRESSION TEST RESULTS =====")
+print(f"MAE:  {linear_mae:.2f}")
+print(f"RMSE: {linear_rmse:.2f}")
+print(f"R²:   {linear_r2:.4f}")
+
+
+# ============================================================
+# 6. POLYNOMIAL REGRESSION
+# ============================================================
+
+polynomial_model = make_pipeline(
+    PolynomialFeatures(degree=2, include_bias=False),
+    LinearRegression()
+)
+
+# Train the model using 2019–2022 data
+polynomial_model.fit(X_train, y_train)
+
+# Predict car sales for 2023
+polynomial_predictions = polynomial_model.predict(X_test)
+
+# Calculate evaluation metrics
+polynomial_mae = mean_absolute_error(y_test, polynomial_predictions)
+
+polynomial_rmse = np.sqrt(
+    mean_squared_error(y_test, polynomial_predictions)
+)
+
+polynomial_r2 = r2_score(y_test, polynomial_predictions)
+
+print("\n===== POLYNOMIAL REGRESSION TEST RESULTS =====")
+print(f"MAE:  {polynomial_mae:.2f}")
+print(f"RMSE: {polynomial_rmse:.2f}")
+print(f"R²:   {polynomial_r2:.4f}")
+
+
+# ============================================================
+# 7. TIME-SERIES CROSS-VALIDATION
 # ============================================================
 
 # Expanding training windows, preserving chronological order
@@ -107,7 +169,7 @@ for fold, (train_idx, val_idx) in enumerate(
 
 
 # ============================================================
-# 6. kNN REGRESSION: AUTOMATIC BEST k
+# 8. kNN REGRESSION: AUTOMATIC BEST k
 # ============================================================
 
 # Pipeline scales the predictors before kNN
@@ -137,6 +199,7 @@ grid_search.fit(X_train, y_train)
 best_k = grid_search.best_params_[
     "kneighborsregressor__n_neighbors"
 ]
+
 print("\n===== kNN GRID SEARCH RESULTS =====")
 print("Best number of neighbors (k):", best_k)
 
@@ -148,9 +211,11 @@ knn_predictions = knn_model.predict(X_test)
 
 # Calculate evaluation metrics
 knn_mae = mean_absolute_error(y_test, knn_predictions)
+
 knn_rmse = np.sqrt(
     mean_squared_error(y_test, knn_predictions)
 )
+
 knn_r2 = r2_score(y_test, knn_predictions)
 
 print("\n===== kNN TEST RESULTS =====")
@@ -159,12 +224,10 @@ print(f"RMSE: {knn_rmse:.2f}")
 print(f"R²:   {knn_r2:.4f}")
 
 
+# ============================================================
+# 9. DECISION TREE REGRESSION
+# ============================================================
 
-# ============================
-# 8. DECISION TREE REGRESSION 
-# ============================
-
-# Create Decision Tree model
 tree_pipeline = DecisionTreeRegressor(
     min_samples_leaf=3,
     random_state=42
@@ -213,7 +276,7 @@ tree_rmse = np.sqrt(
 
 tree_r2 = r2_score(y_test, tree_predictions)
 
-print("\n===== DECISION TREE TEST RESULTS (2023) =====")
+print("\n===== DECISION TREE TEST RESULTS =====")
 print(f"MAE:  {tree_mae:.2f}")
 print(f"RMSE: {tree_rmse:.2f}")
 print(f"R²:   {tree_r2:.4f}")
@@ -221,24 +284,34 @@ print(f"R²:   {tree_r2:.4f}")
 
 
 # ============================================================
-# 9. COMPARE BOTH REGRESSION MODELS
+# 10. COMPARE ALL FOUR REGRESSION MODELS
 # ============================================================
 
 comparison = pd.DataFrame({
     "Model": [
+        "Linear Regression",
+        "Polynomial Regression",
         "kNN Regression",
         "Decision Tree Regression"
     ],
-    
+
     "Test MAE": [
+        linear_mae,
+        polynomial_mae,
         knn_mae,
         tree_mae
     ],
+
     "Test RMSE": [
+        linear_rmse,
+        polynomial_rmse,
         knn_rmse,
         tree_rmse
     ],
+
     "Test R²": [
+        linear_r2,
+        polynomial_r2,
         knn_r2,
         tree_r2
     ]
@@ -249,12 +322,14 @@ print(comparison.round(3).to_string(index=False))
 
 
 # ============================================================
-# 10. ACTUAL VS PREDICTED SALES (BOTH MODELS)
+# 11. ACTUAL VS PREDICTED SALES (ALL FOUR MODELS)
 # ============================================================
 
 results = pd.DataFrame({
     "month_year": test["month_year"].values,
     "actual": y_test.values,
+    "linear_predicted": linear_predictions,
+    "polynomial_predicted": polynomial_predictions,
     "knn_predicted": knn_predictions,
     "tree_predicted": tree_predictions
 })
@@ -271,8 +346,24 @@ plt.plot(
 
 plt.plot(
     results["month_year"],
-    results["knn_predicted"],
+    results["linear_predicted"],
     marker="s",
+    linestyle="--",
+    label="Linear Regression"
+)
+
+plt.plot(
+    results["month_year"],
+    results["polynomial_predicted"],
+    marker="d",
+    linestyle="--",
+    label="Polynomial Regression"
+)
+
+plt.plot(
+    results["month_year"],
+    results["knn_predicted"],
+    marker="^",
     linestyle="--",
     label="kNN Predictions"
 )
@@ -280,12 +371,12 @@ plt.plot(
 plt.plot(
     results["month_year"],
     results["tree_predicted"],
-    marker="^",
+    marker="x",
     linestyle="--",
     label="Decision Tree Predictions"
 )
 
-plt.title("Actual vs Predicted Car Sales (2023)")
+plt.title("Actual vs Predicted Car Sales - All Four Models (2023)")
 plt.xlabel("Month")
 plt.ylabel("Units Sold")
 plt.xticks(rotation=45)
@@ -301,44 +392,3 @@ plt.savefig(
 
 plt.show()
 plt.close()
-
-# ============================================================
-# 14. FINAL SUMMARY
-# ============================================================
-
-##print("\n===== FINAL RESULTS =====")
-print(comparison.round(3).to_string(index=False))
-
-
-# ============================================================
-# SAVE REGRESSION RESULTS TO README.md
-# ============================================================
-
-README_PATH = PROJECT_DIR / "README.md"
-
-# Create Markdown table
-table_rows = [
-    "| Model | Test MAE | Test RMSE | Test R² |"
-]
-
-for _, row in comparison.iterrows():
-    table_rows.append(
-        f"| {row['Model']} "
-        f"| {row['Test MAE']:.2f} "
-        f"| {row['Test RMSE']:.2f} "
-        f"| {row['Test R²']:.4f} |"
-    )
-
-results_table = "\n".join(table_rows)
-
-# Create results section
-results_section = f"""
-## Regression Model Results
-
-{results_table}
-"""
-# Append results to README
-with open(README_PATH, "a", encoding="utf-8") as file:
-    file.write("\n" + results_section)
-
-print("\nRegression results saved to README.md")
